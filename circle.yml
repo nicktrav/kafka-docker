@@ -1,0 +1,19 @@
+machine:
+  services:
+    - docker
+
+test:
+  override:
+    - echo 'pass'
+
+deployment:
+  all:
+    branch: /.*/
+    commands:
+      - sudo /opt/google-cloud-sdk/bin/gcloud --quiet components update
+      - sudo /opt/google-cloud-sdk/bin/gcloud --quiet components update kubectl
+      - echo $GCLOUD_SERVICE_KEY | base64 --decode -i > ${HOME}/account-auth.json
+      - sudo /opt/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file ${HOME}/account-auth.json
+      - sudo /opt/google-cloud-sdk/bin/gcloud config set project $GCLOUD_PROJECT
+      - docker build -t gcr.io/${GCLOUD_PROJECT}/kafka:$CIRCLE_SHA1 .
+      - sudo /opt/google-cloud-sdk/bin/gcloud docker push gcr.io/${GCLOUD_PROJECT}/kafka:$CIRCLE_SHA1

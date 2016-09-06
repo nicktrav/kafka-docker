@@ -1,0 +1,56 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require 'open3'
+
+KAFKA_BIN = 'bin/kafka-server-start.sh'
+CONFIG_FILE = 'server.properties'.freeze
+ZK_CLIENT_PORT = 2181
+
+# Fields to substitute
+BROKER_ID = 'BROKER_ID'.freeze
+ZK_HOSTS = 'ZK_HOSTS'.freeze
+HOSTNAME = 'HOSTNAME'.freeze
+
+options = {}
+OptionParser.new do |opts|
+  opts.banner = 'Usage: kafka-init [options]'
+  opts.on('--id id', 'ID for this broker') do |id|
+    options[:id] = id
+  end
+  opts.on('--zookeeper host1,host2,...', Array, 'List of Zookeeper hosts') do |zk|
+    options[:zk] = zk
+  end
+  opts.on('--use-ip', 'Advertize this broker with its IP address') do
+    options[:ip] = :ip
+  end
+  opts.on('--hostname hostname', 'Advertize this broker with its IP address') do |host|
+    options[:hostname] = host
+  end
+end.parse!
+
+raise 'Must provide a broker ID' unless options.key? :id
+raise 'Must provide a list of ZK hosts' unless options.key? :zk
+
+config = File.read(CONFIG_FILE)
+
+# Replace the Broker ID
+config.gsub!(BROKER_ID, options.fetch(:id).to_s)
+
+# Replace the Zookeeper hosts
+config.gsub!(
+  ZK_HOSTS,
+  options.fetch(:zk).map { |host| "#{host}:#{ZK_CLIENT_PORT}" }.join(',')
+)
+
+# Replace the address on which to advertize
+if options.key?(:ip)
+  ip_address = `ifconfig eth0 | grep 'inet\\s' | awk {'print $2'}`.chomp
+  config.gsub!(HOSTNAME, ip_address)
+elsif options.key?(:hostname)
+  config.gsub!(HOSTNAME, options.fetch(:hostname))
+else
+  config.gsub!(HOSTNAME, `hostname`.chomp)
+end
+
+File.write(CONFIG_FILE, config)

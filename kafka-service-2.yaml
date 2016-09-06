@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-2
+spec:
+  ports:
+    - name: broker
+      port: 9092
+  selector:
+    app: kafka
+    server-id: "2"
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: kafka-2
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: kafka
+        server-id: "2"
+    spec:
+      volumes:
+        - name: data
+          emptyDir: {}
+      containers:
+        - name: server
+          image: gcr.io/hackernews-scraper/kafka:f88c325
+          args:
+            - "--zookeeper"
+            - "zookeeper-1,zookeeper-2,zookeeper-3"
+            - "--id"
+            - "2"
+            - "--use-ip"
+          ports:
+            - containerPort: 9092
+          volumeMounts:
+            - mountPath: /data/kafkadata
+              name: data
